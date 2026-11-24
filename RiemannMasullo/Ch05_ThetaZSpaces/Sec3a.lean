@@ -1426,6 +1426,305 @@ private theorem sAdelePrincipalValue_preserves_thetaKernel_translate
   exact tsum_congr fun t => congrArg (fun y => f (Multiplicative.ofAdd y))
     (mul_left_comm g.inv (d t).val x.val)
 
+/-- A predicate on the target of an inductive tensor product with a tensor product of a family of
+modules holds everywhere once it holds on pure tensors and is closed under addition and under
+multiplication by scalars. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_ind {ι : Type*}
+    {E N : Type*} {M : ι → Type*} [∀ i, AddCommGroup (M i)] [∀ i, Module ℂ (M i)]
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E]
+    [AddCommGroup N] [Module ℂ N] [TopologicalSpace N]
+    (e : InductiveTensor E (FinestLocallyConvex (⨂[ℂ] i, M i)) ≃L[ℂ] N) (P : N → Prop)
+    (hadd : ∀ x y, P x → P y → P (x + y)) (hsmul : ∀ (r : ℂ) x, P x → P (r • x))
+    (hpure : ∀ (a : E) (g : ∀ i, M i), P (e (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] i, g i)))) (x : N) : P x := by
+  have key : ∀ y : E ⊗[ℂ] (⨂[ℂ] i, M i), P (e y) := by
+    intro y
+    induction y using TensorProduct.inductionOn with
+    | tmul a b =>
+      induction b using PiTensorProduct.induction_on with
+      | smul_tprod r g =>
+        exact (congrArg (fun t ↦ P (e t)) (TensorProduct.tmul_smul r a _)).mpr
+          ((congrArg P (map_smul e r _)).mpr (hsmul r _ (hpure a g)))
+      | add b c hb hc =>
+        exact (congrArg (fun t ↦ P (e t)) (TensorProduct.tmul_add a b c)).mpr
+          ((congrArg P (map_add e _ _)).mpr (hadd _ _ hb hc))
+    | add y z hy hz => exact (congrArg P (map_add e y z)).mpr (hadd _ _ hy hz)
+  exact (congrArg P (e.apply_symm_apply x)).mp (key (e.symm x))
+
+/-- The coordinates of an S-adele multiplied by the inverse of the local unit at `v`: only the
+`v`-coordinate changes, and it is multiplied by the inverse of the local unit. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_coord {S : Finset V} (v : S)
+    (c : (v.val.adicCompletion F)ˣ) (z : SAdeleRing F S) :
+    (((adelicPrincipalValueLocalUnit v c)⁻¹ : (SAdeleRing F S)ˣ).val * z).1 = z.1 ∧
+      (((adelicPrincipalValueLocalUnit v c)⁻¹ : (SAdeleRing F S)ˣ).val * z).2 v =
+        (↑c⁻¹ : v.val.adicCompletion F) * z.2 v ∧
+      ∀ w : S, w ≠ v →
+        (((adelicPrincipalValueLocalUnit v c)⁻¹ : (SAdeleRing F S)ˣ).val * z).2 w = z.2 w := by
+  classical
+  refine ⟨one_mul z.1, ?_, fun w hw ↦ ?_⟩
+  · change Function.update (fun w : S ↦ (1 : w.val.adicCompletion F)) v c.inv v * z.2 v = _
+    rw [Function.update_self]
+    rfl
+  · change Function.update (fun w : S ↦ (1 : w.val.adicCompletion F)) v c.inv w * z.2 w = _
+    rw [Function.update_of_ne hw, one_mul]
+
+/-- The local unit at `v` of the S-idele group depends continuously on the unit. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_continuous {S : Finset V}
+    (v : S) : Continuous (fun c : (v.val.adicCompletion F)ˣ ↦
+      (adelicPrincipalValueLocalUnit v c : (SAdeleRing F S)ˣ)) := by
+  classical
+  refine Units.continuous_iff.mpr ⟨?_, ?_⟩
+  · change Continuous fun c : (v.val.adicCompletion F)ˣ ↦
+      ((1 : InfiniteAdeleRing F),
+        Function.update (fun w : S ↦ (1 : w.val.adicCompletion F)) v c.val)
+    exact continuous_const.prodMk (continuous_const.update v Units.continuous_val)
+  · change Continuous fun c : (v.val.adicCompletion F)ˣ ↦
+      ((1 : InfiniteAdeleRing F),
+        Function.update (fun w : S ↦ (1 : w.val.adicCompletion F)) v
+          (↑c⁻¹ : v.val.adicCompletion F))
+    exact continuous_const.prodMk
+      (continuous_const.update v (Units.continuous_val.comp continuous_inv))
+
+/-- Termwise integration, over a set of finite measure, of a series of continuous functions
+whose series of norms is bounded on the set: the series of the integrals is summable and its
+sum is the integral of the sum. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_integral_tsum {ι X : Type*}
+    [Countable ι] [TopologicalSpace X] [MeasurableSpace X] [OpensMeasurableSpace X]
+    (μ : Measure X) (U : Set X) (hU : MeasurableSet U) (hUfin : μ U ≠ ⊤) (Φ : ι → X → ℂ)
+    (hΦ : ∀ ξ, Continuous (Φ ξ)) (B : ℝ)
+    (hB : ∀ u ∈ U, Summable (fun ξ ↦ ‖Φ ξ u‖) ∧ ∑' ξ, ‖Φ ξ u‖ ≤ B) :
+    Summable (fun ξ ↦ ∫ u in U, Φ ξ u ∂μ) ∧
+      ∫ u in U, ∑' ξ, Φ ξ u ∂μ = ∑' ξ, ∫ u in U, Φ ξ u ∂μ := by
+  have hfin : ∑' ξ, ∫⁻ u in U, ‖Φ ξ u‖ₑ ∂μ ≠ ⊤ := by
+    rw [← lintegral_tsum fun ξ ↦ (hΦ ξ).measurable.eNorm.aemeasurable]
+    refine ne_top_of_le_ne_top (ENNReal.mul_ne_top (ENNReal.ofReal_ne_top (r := B)) hUfin)
+      ((setLIntegral_mono' hU fun u hu ↦ ?_).trans_eq (setLIntegral_const U (ENNReal.ofReal B)))
+    obtain ⟨hs, hle⟩ := hB u hu
+    simp only [← ofReal_norm]
+    rw [← ENNReal.ofReal_tsum_of_nonneg (fun _ ↦ norm_nonneg _) hs]
+    exact ENNReal.ofReal_le_ofReal hle
+  refine ⟨?_, integral_tsum (fun ξ ↦ (hΦ ξ).aestronglyMeasurable) hfin⟩
+  refine Summable.of_norm_bounded (ENNReal.summable_toReal hfin) fun ξ ↦ ?_
+  refine (norm_integral_le_lintegral_norm _).trans_eq ?_
+  simp only [ofReal_norm]
+
+/-- The principal value formula at the single place `v` on a pure tensor. Let two tests be the
+products of one archimedean factor with local factors that agree away from `v`, the local factor
+of the second at `v` being the principal value of that of the first. Then the value of the second
+at an S-adele `z` is the value of the first at `z` minus the normalized average, over the integer
+units `u` at `v`, of the values of the first at `z` multiplied by the inverse of the local unit
+`π u` at `v`. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_tmul {S : Finset V}
+    (v : S) (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).IsUniformizer (π : v.val.adicCompletion F))
+    (a : ℬ(InfiniteAdeleRing F)) (g g' : ∀ w : S, ℬ(w.val.adicCompletion F))
+    (hv : g' v = finitePlacePrincipalValue v.val (g v)) (hne : ∀ w : S, w ≠ v → g' w = g w)
+    (b b' : ℬₛ(S))
+    (hb : ∀ x : SAdeleRing F S, b (Multiplicative.ofAdd x) =
+      a (Multiplicative.ofAdd x.1) * ∏ w : S, g w (Multiplicative.ofAdd (x.2 w)))
+    (hb' : ∀ x : SAdeleRing F S, b' (Multiplicative.ofAdd x) =
+      a (Multiplicative.ofAdd x.1) * ∏ w : S, g' w (Multiplicative.ofAdd (x.2 w)))
+    (z : SAdeleRing F S) :
+    b' (Multiplicative.ofAdd z) =
+      b (Multiplicative.ofAdd z) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            b (Multiplicative.ofAdd
+              (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val * z))
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by
+  classical
+  have hprod (h : S → ℂ) : ∏ w : S, h w = h v * ∏ w ∈ Finset.univ.erase v, h w :=
+    (Finset.mul_prod_erase Finset.univ h (Finset.mem_univ v)).symm
+  have hin (u : (v.val.adicCompletion F)ˣ) :
+      b (Multiplicative.ofAdd
+        (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val * z)) =
+      a (Multiplicative.ofAdd z.1) * (g v (Multiplicative.ofAdd
+        ((↑u⁻¹ : v.val.adicCompletion F) * ((↑π⁻¹ : v.val.adicCompletion F) * z.2 v))) *
+          ∏ w ∈ Finset.univ.erase v, g w (Multiplicative.ofAdd (z.2 w))) := by
+    have hc := sLocalAdelicTheta_sAdelePrincipalValue_singleton_coord v (π * u) z
+    rw [hb, hprod]
+    refine congrArg₂ (· * ·) (congrArg (fun y ↦ a (Multiplicative.ofAdd y)) hc.1)
+      (congrArg₂ (· * ·) (congrArg (fun y ↦ g v (Multiplicative.ofAdd y)) (hc.2.1.trans ?_))
+        (Finset.prod_congr rfl fun w hw ↦ congrArg (fun y ↦ g w (Multiplicative.ofAdd y))
+          (hc.2.2 w (Finset.ne_of_mem_erase hw))))
+    rw [mul_inv_rev, Units.val_mul, mul_assoc]
+  have hpv : g' v (Multiplicative.ofAdd (z.2 v)) =
+      g v (Multiplicative.ofAdd (z.2 v)) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            g v (Multiplicative.ofAdd ((↑u⁻¹ : v.val.adicCompletion F) *
+              ((↑π⁻¹ : v.val.adicCompletion F) * z.2 v)))
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) :=
+    (congrArg (fun h : ℬ(v.val.adicCompletion F) ↦ h (Multiplicative.ofAdd (z.2 v))) hv).trans
+      (finitePlacePrincipalValue_spec v.val π hπ (g v) (Multiplicative.ofAdd (z.2 v)))
+  have hrest : ∏ w ∈ Finset.univ.erase v, g' w (Multiplicative.ofAdd (z.2 w)) =
+      ∏ w ∈ Finset.univ.erase v, g w (Multiplicative.ofAdd (z.2 w)) :=
+    Finset.prod_congr rfl fun w hw ↦ congrArg
+      (fun h : ℬ(w.val.adicCompletion F) ↦ h (Multiplicative.ofAdd (z.2 w)))
+      (hne w (Finset.ne_of_mem_erase hw))
+  rw [hb', hb, hprod, hprod (fun w ↦ g w (Multiplicative.ofAdd (z.2 w))), hrest, hpv,
+    integral_congr_ae (Filter.Eventually.of_forall hin), integral_const_mul, integral_mul_const]
+  ring
+
+/-- The S-local principal value at the single place `v`, evaluated at an S-adele `z`: the value
+of the test at `z` minus the normalized average, over the integer units `u` at `v`, of its values
+at `z` multiplied by the inverse of the local unit `π u` at `v`. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_pointwise {S : Finset V}
+    (v : S) (π : (v.val.adicCompletion F)ˣ)
+    (hπ : (Valued.v : Valuation (v.val.adicCompletion F)
+      (WithZero (Multiplicative ℤ))).IsUniformizer (π : v.val.adicCompletion F))
+    (f : ℬₛ(S)) (z : SAdeleRing F S) :
+    sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) f
+        (Multiplicative.ofAdd z) =
+      f (Multiplicative.ofAdd z) -
+        ((finiteLocalMultiplicativeTamagawaMeasure F v.val).real
+          ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ) : ℂ)⁻¹ *
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            f (Multiplicative.ofAdd
+              (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val * z))
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by
+  classical
+  have : BorelSpace (v.val.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v.val
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v.val
+  let U : Set (v.val.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v.val).units : Set (v.val.adicCompletion F)ˣ)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val))
+  let T : (v.val.adicCompletion F)ˣ → SAdeleRing F S := fun u ↦
+    ((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val
+  have hT : Continuous T :=
+    Units.continuous_val.comp
+      (((sLocalAdelicTheta_sAdelePrincipalValue_singleton_continuous v).comp
+        (continuous_const.mul continuous_id)).inv)
+  have hint (b : ℬₛ(S)) (z : SAdeleRing F S) :
+      IntegrableOn (fun u ↦ b (Multiplicative.ofAdd (T u * z))) U μ :=
+    ((schwartzBruhat_continuous b).comp (continuous_ofAdd.comp
+      (hT.mul continuous_const))).continuousOn.integrableOn_compact hUc
+  let P : ℬₛ(S) → Prop := fun b ↦ ∀ z : SAdeleRing F S,
+    sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) b
+        (Multiplicative.ofAdd z) =
+      b (Multiplicative.ofAdd z) - (μ.real U : ℂ)⁻¹ *
+        ∫ u in U, b (Multiplicative.ofAdd (T u * z)) ∂μ
+  have hadd (b₁ b₂ : ℬₛ(S)) (h₁ : P b₁) (h₂ : P b₂) : P (b₁ + b₂) := fun z ↦ by
+    rw [map_add]
+    change sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) b₁
+          (Multiplicative.ofAdd z) +
+        sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) b₂
+          (Multiplicative.ofAdd z) =
+      (b₁ (Multiplicative.ofAdd z) + b₂ (Multiplicative.ofAdd z)) - _ *
+        ∫ u in U, (b₁ (Multiplicative.ofAdd (T u * z)) + b₂ (Multiplicative.ofAdd (T u * z))) ∂μ
+    rw [integral_add (hint b₁ z) (hint b₂ z), h₁ z, h₂ z]
+    ring
+  have hsmul (r : ℂ) (b : ℬₛ(S)) (h : P b) : P (r • b) := fun z ↦ by
+    rw [map_smul]
+    change r * sAdelePrincipalValue F (Finset.singleton_subset_iff.mpr v.property) b
+        (Multiplicative.ofAdd z) =
+      r * b (Multiplicative.ofAdd z) - _ * ∫ u in U, r * b (Multiplicative.ofAdd (T u * z)) ∂μ
+    rw [integral_const_mul, h z]
+    ring
+  have hspec := (sAdeleSchwartz_inductiveTensor_equiv F S).choose_spec
+  have hpure (a : ℬ(InfiniteAdeleRing F)) (g : ∀ w : S, ℬ(w.val.adicCompletion F)) :
+      P ((sAdeleSchwartz_inductiveTensor_equiv F S).choose (a ⊗ₜ[ℂ] (⨂ₜ[ℂ] w, g w))) := fun z ↦
+    (congrArg (fun b : ℬₛ(S) ↦ b (Multiplicative.ofAdd z)) (sAdelePrincipalValue_tmul (F := F)
+      (Finset.singleton_subset_iff.mpr v.property : ({v.val} : Finset V) ⊆ S) a g)).trans
+      (sLocalAdelicTheta_sAdelePrincipalValue_singleton_tmul v π hπ a g _
+        (ite_eq_left (Finset.mem_singleton_self v.val))
+        (fun w hw ↦ ite_eq_right fun h ↦ hw (Subtype.ext (Finset.mem_singleton.mp h)))
+        _ _ (hspec a g) (hspec a _) z)
+  exact sLocalAdelicTheta_sAdelePrincipalValue_singleton_ind
+    (sAdeleSchwartz_inductiveTensor_equiv F S).choose P hadd hsmul hpure f z
+
+/-- For a test `f` and an S-idele `x`: the theta series of `f` at `x` is summable, the series of
+the integrals, over the integer units `u` at `v`, of the theta summands of `f` at `x` multiplied
+by the inverse of the local unit `π u` at `v` is summable, and the sum of that series is the
+integral of the sum. The theta series converges absolutely and uniformly on the compact set of
+the S-ideles that occur. -/
+private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton_exchange {S : Finset V}
+    (v : S) (π : (v.val.adicCompletion F)ˣ) (f : ℬₛ(S)) (x : (SAdeleRing F S)ˣ) :
+    Summable (fun ξ : (Set.integer (S : Set V) F)ˣ ↦
+        f (Multiplicative.ofAdd (Units.val (sUnitEmbedding F S ξ * x)))) ∧
+      Summable (fun ξ : (Set.integer (S : Set V) F)ˣ ↦
+        ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ),
+          f (Multiplicative.ofAdd
+            (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val *
+              Units.val (sUnitEmbedding F S ξ * x)))
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val)) ∧
+      ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+            Set (v.val.adicCompletion F)ˣ),
+          ∑' ξ : (Set.integer (S : Set V) F)ˣ,
+            f (Multiplicative.ofAdd
+              (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val *
+                Units.val (sUnitEmbedding F S ξ * x)))
+          ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) =
+        ∑' ξ : (Set.integer (S : Set V) F)ˣ,
+          ∫ u in ((HeightOneSpectrum.adicCompletionIntegers F v.val).units :
+              Set (v.val.adicCompletion F)ˣ),
+            f (Multiplicative.ofAdd
+              (((adelicPrincipalValueLocalUnit v (π * u))⁻¹ : (SAdeleRing F S)ˣ).val *
+                Units.val (sUnitEmbedding F S ξ * x)))
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by
+  classical
+  have : BorelSpace (v.val.adicCompletion F)ˣ := ⟨rfl⟩
+  have := finiteLocalMultiplicativeTamagawaMeasure_isHaarMeasure (F := F) v.val
+  have : Countable F := (Module.finBasis ℚ F).equivFun.injective.countable
+  have : Countable (Set.integer (S : Set V) F)ˣ :=
+    (Subtype.val_injective.comp Units.val_injective).countable
+  let μ := finiteLocalMultiplicativeTamagawaMeasure F v.val
+  let U : Set (v.val.adicCompletion F)ˣ :=
+    ((HeightOneSpectrum.adicCompletionIntegers F v.val).units : Set (v.val.adicCompletion F)ˣ)
+  have hUo : IsOpen U := Submonoid.isOpen_units (Valued.isOpen_valuationSubring _)
+  have hUc : IsCompact U := Submonoid.units_isCompact
+    (isCompact_iff_compactSpace.mpr (compactSpace_adicCompletionIntegers v.val))
+  have hUfin : μ U ≠ ⊤ := hUc.measure_ne_top
+  let ι : (v.val.adicCompletion F)ˣ → (SAdeleRing F S)ˣ := fun u ↦
+    (adelicPrincipalValueLocalUnit v (π * u))⁻¹
+  have hι : Continuous ι :=
+    ((sLocalAdelicTheta_sAdelePrincipalValue_singleton_continuous v).comp
+      (continuous_const.mul continuous_id)).inv
+  let Φ : (Set.integer (S : Set V) F)ˣ → (v.val.adicCompletion F)ˣ → ℂ := fun ξ u ↦
+    f (Multiplicative.ofAdd ((ι u).val * Units.val (sUnitEmbedding F S ξ * x)))
+  have hΦc (ξ : (Set.integer (S : Set V) F)ˣ) : Continuous (Φ ξ) :=
+    (schwartzBruhat_continuous f).comp (continuous_ofAdd.comp
+      ((Units.continuous_val.comp hι).mul continuous_const))
+  let K : Set (SAdeleRing F S)ˣ := (fun u ↦ ι u * x) '' U
+  have hK : IsCompact K := hUc.image (hι.mul continuous_const)
+  have hsu := sLocalAdelicTheta_summableUniformlyOn_norm F S f K hK
+  have hterm (ξ : (Set.integer (S : Set V) F)ˣ) (u : (v.val.adicCompletion F)ˣ) :
+      ‖f (Multiplicative.ofAdd (Units.val (sUnitEmbedding F S ξ * (ι u * x))))‖ = ‖Φ ξ u‖ :=
+    congrArg (fun y ↦ ‖f (Multiplicative.ofAdd y)‖)
+      (mul_left_comm (sUnitEmbedding F S ξ).val (ι u).val x.val)
+  have hcontS : ContinuousOn (fun g : (SAdeleRing F S)ˣ ↦
+      ∑' ξ : (Set.integer (S : Set V) F)ˣ,
+        ‖f (Multiplicative.ofAdd (Units.val (sUnitEmbedding F S ξ * g)))‖) K := by
+    refine (hasSumUniformlyOn_iff_tendstoUniformlyOn.mp hsu.hasSumUniformlyOn).continuousOn
+      (Filter.Eventually.of_forall fun I ↦
+        (continuous_finsetSum I fun ξ _ ↦ ?_).continuousOn).frequently
+    exact ((schwartzBruhat_continuous f).comp (continuous_ofAdd.comp
+      (Units.continuous_val.comp (continuous_const.mul continuous_id)))).norm
+  obtain ⟨B, hB⟩ := hK.exists_bound_of_continuousOn hcontS
+  have hbound (u : (v.val.adicCompletion F)ˣ) (hu : u ∈ U) :
+      Summable (fun ξ ↦ ‖Φ ξ u‖) ∧ ∑' ξ, ‖Φ ξ u‖ ≤ B := by
+    have hp : ι u * x ∈ K := ⟨u, hu, rfl⟩
+    have hs := (hsu.summable hp).congr (fun ξ ↦ hterm ξ u)
+    refine ⟨hs, ?_⟩
+    have h1 := hB _ hp
+    rw [Real.norm_of_nonneg (tsum_nonneg fun _ ↦ norm_nonneg _)] at h1
+    exact (tsum_congr fun ξ ↦ (hterm ξ u).symm).trans_le h1
+  exact ⟨Summable.of_norm ((sLocalAdelicTheta_summableUniformlyOn_norm F S f {x}
+      isCompact_singleton).summable (Set.mem_singleton x)),
+    sLocalAdelicTheta_sAdelePrincipalValue_singleton_integral_tsum μ U hUo.measurableSet hUfin
+      Φ hΦc B hbound⟩
+
 /-- Paper: (5.3.1.9), p. 242.
 The single-place operator at `v` is `1` minus the normalized average over the integer units at
 `v` of the translates by the reciprocal uniformizer times the unit, and S-local theta turns this
@@ -1450,7 +1749,15 @@ private theorem sLocalAdelicTheta_sAdelePrincipalValue_singleton {S : Finset V} 
             sLocalAdelicTheta F S
               (schwartzBruhatUnitTranslate
                 (adelicPrincipalValueLocalUnit v (π * (u : (v.val.adicCompletion F)ˣ))) f) x
-            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by sorry
+            ∂(finiteLocalMultiplicativeTamagawaMeasure F v.val) := by
+  have hex := sLocalAdelicTheta_sAdelePrincipalValue_singleton_exchange v π f x
+  refine (sLocalAdelicTheta_apply F S _ x).trans ?_
+  refine (tsum_congr fun ξ ↦ sLocalAdelicTheta_sAdelePrincipalValue_singleton_pointwise v π hπ f
+    (Units.val (sUnitEmbedding F S ξ * x))).trans ?_
+  refine (hex.1.tsum_sub (hex.2.1.mul_left _)).trans ?_
+  refine congrArg₂ (· - ·) (sLocalAdelicTheta_apply F S f x).symm ?_
+  rw [tsum_mul_left, ← hex.2.2]
+  rfl
 
 /-- Paper: (5.3.1.9), p. 242.
 The single-place principal value at `v` maps the theta kernel into itself: theta of the average
@@ -4167,6 +4474,76 @@ theorem coordinateDerivative_testFunction_toSchwartz {ι : Type*} [Fintype ι]
     simp only [List.map_cons, List.prod_cons, mul_apply_eq_comp]
     rw [← ih, ← hpow]
 
+/-- A distribution vanishes on every test function whose support does not meet the support of
+the distribution: such a test function is a finite sum of test functions, each supported in a
+set on which the distribution vanishes. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_extension_zero {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] [FiniteDimensional ℝ E]
+    (A : StrongDual ℂ 𝓓((⊤ : Opens E), ℂ)) (h : 𝓓((⊤ : Opens E), ℂ))
+    (hd : Disjoint (tsupport (h : E → ℂ)) (Distribution.dsupport (⇑A))) : A h = 0 := by
+  let K := tsupport (h : E → ℂ)
+  have hx (x : K) : x.val ∉ Distribution.dsupport (⇑A) := Set.disjoint_left.mp hd x.property
+  choose U hv ho hmem using fun x : K ↦ (Distribution.notMem_dsupport_iff x.val).mp (hx x)
+  obtain ⟨s, hs⟩ := h.hasCompactSupport.elim_finite_subcover U ho
+    fun x hx ↦ mem_iUnion.mpr ⟨⟨x, hx⟩, hmem _⟩
+  obtain ⟨ρ, hρ⟩ := SmoothPartitionOfUnity.exists_isSubordinate (modelWithCornersSelf ℝ E)
+    (isClosed_tsupport (h : E → ℂ)) (fun i : s ↦ U i.val) (fun i ↦ ho i.val)
+    (by simpa only [iUnion_subtype] using hs)
+  let g (i : s) : 𝓓((⊤ : Opens E), ℂ) :=
+    ⟨fun x ↦ ρ i x • h x, (contMDiff_iff_contDiff.mp (ρ i).contMDiff).smul h.contDiff,
+      h.hasCompactSupport.smul_left (f := (ρ i : E → ℝ)), fun _ _ ↦ trivial⟩
+  have hz (i : s) : A (g i) = 0 :=
+    hv i.val (g i) ((tsupport_smul_subset_left _ _).trans (hρ i))
+  have hsum : h = ∑ i : s, g i := by
+    ext x
+    rw [sum_apply]
+    change h x = ∑ i : s, ρ i x • h x
+    rw [← Finset.sum_smul]
+    by_cases hxK : x ∈ K
+    · rw [← finsum_eq_sum_of_fintype, ρ.sum_eq_one hxK, one_smul]
+    · rw [image_eq_zero_of_notMem_tsupport hxK, smul_zero]
+  rw [hsum, map_sum]
+  exact Finset.sum_eq_zero fun i _ ↦ hz i
+
+/-- Multiplication by a smooth function with compact support is a continuous linear map from
+the Schwartz space to the space of test functions: it takes values in the test functions
+supported in the support of the multiplier, and there every seminorm is bounded by a Schwartz
+seminorm of the product. -/
+private theorem distribution_coordinatePlane_decomposition_tempered_extension_cutoff {E : Type*}
+    [NormedAddCommGroup E] [NormedSpace ℝ E] (c : E → ℂ) (hc : ContDiff ℝ (∞) c)
+    (hcs : HasCompactSupport c) :
+    ∃ M : 𝓢(E, ℂ) →L[ℂ] 𝓓((⊤ : Opens E), ℂ), ∀ (f : 𝓢(E, ℂ)) (x : E), M f x = c x * f x := by
+  have hct : c.HasTemperateGrowth := hcs.hasTemperateGrowth hc
+  let K : Compacts E := ⟨tsupport c, hcs⟩
+  have hsupp (f : 𝓢(E, ℂ)) : support (⇑(SchwartzMap.smulLeftCLM ℂ c f)) ⊆ K :=
+    (subset_tsupport _).trans
+      ((SchwartzMap.tsupport_smulLeftCLM_subset c f).trans inter_subset_right)
+  let L : 𝓢(E, ℂ) →ₗ[ℂ] ContDiffMapSupportedIn E ℂ ⊤ K :=
+    { toFun := fun f ↦ ContDiffMapSupportedIn.of_support_subset
+        ((SchwartzMap.smulLeftCLM ℂ c f).smooth ⊤) (hsupp f)
+      map_add' := fun f g ↦ ContDiffMapSupportedIn.ext fun x ↦ by
+        change SchwartzMap.smulLeftCLM ℂ c (f + g) x =
+          SchwartzMap.smulLeftCLM ℂ c f x + SchwartzMap.smulLeftCLM ℂ c g x
+        rw [map_add, add_apply]
+      map_smul' := fun a f ↦ ContDiffMapSupportedIn.ext fun x ↦ by
+        change SchwartzMap.smulLeftCLM ℂ c (a • f) x = a • SchwartzMap.smulLeftCLM ℂ c f x
+        rw [map_smul, smul_apply] }
+  have hL : Continuous L := by
+    refine WithSeminorms.continuous_of_continuous_comp
+      (ContDiffMapSupportedIn.withSeminorms ℂ E ℂ ⊤ K) L fun i ↦ ?_
+    have hq : Continuous ((SchwartzMap.seminorm ℂ 0 i).comp
+        (SchwartzMap.smulLeftCLM ℂ c).toLinearMap) :=
+      ((schwartz_withSeminorms ℂ E ℂ).continuous_seminorm (0, i)).comp
+        (SchwartzMap.smulLeftCLM ℂ c).continuous
+    refine Seminorm.continuous_of_le hq fun f ↦ ?_
+    refine (ContDiffMapSupportedIn.seminorm_top_le_iff ℂ (apply_nonneg _ _) i _).mpr
+      fun x _ ↦ ?_
+    exact SchwartzMap.norm_iteratedFDeriv_le_seminorm ℂ (SchwartzMap.smulLeftCLM ℂ c f) i x
+  refine ⟨(TestFunction.ofSupportedInCLM ℂ (K := K) (fun _ _ ↦ trivial)).comp ⟨L, hL⟩,
+    fun f x ↦ ?_⟩
+  change SchwartzMap.smulLeftCLM ℂ c f x = c x * f x
+  rw [SchwartzMap.smulLeftCLM_apply_apply hct, smul_eq_mul]
+
 /-- Paper: Theorem 5.3.2.3(5), p. 245.
 A compactly supported distribution has a tempered extension. Cutting a Schwartz test off by a
 test function that equals one on a neighbourhood of the distribution's support does not change
@@ -4177,7 +4554,21 @@ private theorem distribution_coordinatePlane_decomposition_tempered_extension {E
     (hA : IsCompact (Distribution.dsupport (⇑A))) :
     ∃ B : StrongDual ℂ 𝓢(E, ℂ),
       ∀ g : 𝓓((⊤ : Opens E), ℂ), B (g.hasCompactSupport.toSchwartzMap g.contDiff) = A g := by
-  sorry
+  obtain ⟨R, hR0, hR⟩ := hA.isBounded.subset_ball_lt 0 0
+  let χ : ContDiffBump (0 : E) := ⟨R, R + 1, hR0, lt_add_one R⟩
+  obtain ⟨M, hM⟩ := distribution_coordinatePlane_decomposition_tempered_extension_cutoff
+    (fun x : E ↦ (χ x : ℂ)) (Complex.ofRealCLM.contDiff.comp χ.contDiff)
+    (χ.hasCompactSupport.comp_left Complex.ofReal_zero)
+  refine ⟨A.comp M, fun g ↦ ?_⟩
+  rw [ContinuousLinearMap.comp_apply, ← sub_eq_zero, ← map_sub]
+  refine distribution_coordinatePlane_decomposition_tempered_extension_zero A _
+    (Set.disjoint_left.mpr fun x hx hxA ↦ ?_)
+  have hsub : tsupport (⇑(M (g.hasCompactSupport.toSchwartzMap g.contDiff) - g)) ⊆
+      (Metric.ball (0 : E) R)ᶜ := by
+    refine closure_minimal (fun y hy hyb ↦ hy ?_) Metric.isOpen_ball.isClosed_compl
+    rw [sub_apply, hM, χ.one_of_mem_closedBall (Metric.ball_subset_closedBall hyb)]
+    simp
+  exact hsub hx (hR hxA)
 
 /-- Restriction to the coordinate plane commutes with passing a compactly supported test to
 its Schwartz function: both restrictions are given by inserting zeros in the normal
