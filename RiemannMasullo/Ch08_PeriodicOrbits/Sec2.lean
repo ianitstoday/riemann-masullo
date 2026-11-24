@@ -383,10 +383,52 @@ theorem adeleNormOneOrbitUnion_locallyCompactSpace :
       (TopologicalSpace.coinduced (adeleNormOneOrbitMap F) inferInstance) := by
   sorry
 
+/-- The S-idelic norm is continuous: it is a finite product of powers of coordinate norms. -/
+private theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace_continuous
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    Continuous (sIdeleNorm F S) := by
+  apply Units.isEmbedding_val₀.continuous_iff.mpr
+  change Continuous (fun g : (SAdeleRing F S)ˣ ↦ ((sIdeleNorm F S g).val))
+  simp only [sIdeleNorm, MonoidHom.mul_apply, MonoidHom.finsetProd_apply, MonoidHom.pow_apply,
+    Units.val_mul, Units.coe_prod, Units.val_pow_eq_pow_val]
+  change Continuous (fun g : (SAdeleRing F S)ˣ ↦
+    (∏ w : InfinitePlace F, ‖g.val.1 w‖₊ ^ w.mult) * ∏ v : S, ‖g.val.2 v‖₊)
+  fun_prop
+
+/-- The norm-one subgroup of the S-ideles is σ-compact: it is closed in the S-idele group,
+which is locally compact and second countable. -/
+private theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace_kernel
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    SigmaCompactSpace (MonoidHom.ker (sIdeleNorm F S)) := by
+  have h2 := sAdeleNormOneOrbitUnion_secondCountable_sAdeleRing F S
+  have hd := sIdeleGroup_description F S
+  have h3 : SecondCountableTopology (SAdeleRing F S)ˣ := hd.1.secondCountableTopology
+  have h4 : LocallyCompactSpace (SAdeleRing F S)ˣ := hd.2.2.1
+  have h5 : SigmaCompactSpace (SAdeleRing F S)ˣ := inferInstance
+  have hcl : IsClosed ((MonoidHom.ker (sIdeleNorm F S) : Subgroup (SAdeleRing F S)ˣ) :
+      Set (SAdeleRing F S)ˣ) := by
+    rw [MonoidHom.coe_ker]
+    exact isClosed_singleton.preimage
+      (sAdeleNormOneOrbitUnion_sigmaCompactSpace_continuous F S)
+  exact hcl.sigmaCompactSpace
+
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is σ-compact. -/
 theorem sAdeleNormOneOrbitUnion_sigmaCompactSpace :
     SigmaCompactSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have h1 := sAdeleNormOneOrbitUnion_sigmaCompactSpace_kernel F S
+  have h2 : Finite (sAdeleOrbitBasepoints F S) :=
+    (Set.finite_range (sAdeleOrbitBasepoint F S)).to_subtype
+  have hc : Continuous (sAdeleNormOneOrbitMap F S) := by
+    refine Continuous.subtype_mk ?_ _
+    exact (continuous_subtype_val.comp continuous_fst).smul
+      (continuous_subtype_val.comp continuous_snd)
+  have hs : Surjective (sAdeleNormOneOrbitMap F S) := by
+    rintro ⟨x, hx⟩
+    obtain ⟨g, z, hgz⟩ := (mem_sAdeleNormOneOrbitUnion_iff F S x).mp hx
+    exact ⟨(g, z), Subtype.ext hgz⟩
+  have hr := isSigmaCompact_range hc
+  rw [hs.range_eq] at hr
+  exact isSigmaCompact_univ_iff.mp hr
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is σ-compact
 in the adelic subspace topology. -/
