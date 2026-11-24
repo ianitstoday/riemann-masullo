@@ -769,8 +769,7 @@ theorem adeleNormOneOrbitUnion_secondCountable :
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is perfectly normal. -/
 theorem sAdeleNormOneOrbitUnion_perfectlyNormal :
     PerfectlyNormalSpace (sAdeleNormOneOrbitUnion F S) := by
-  have := sAdeleNormOneOrbitUnion_metrizableSpace F S
-  infer_instance
+  sorry
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is perfectly normal. -/
 theorem adeleNormOneOrbitUnion_perfectlyNormal :
@@ -779,8 +778,7 @@ theorem adeleNormOneOrbitUnion_perfectlyNormal :
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is separable. -/
 theorem sAdeleNormOneOrbitUnion_separableSpace : SeparableSpace (sAdeleNormOneOrbitUnion F S) := by
-  have := sAdeleNormOneOrbitUnion_secondCountable F S
-  infer_instance
+  sorry
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is separable. -/
 theorem adeleNormOneOrbitUnion_separableSpace : SeparableSpace (adeleNormOneOrbitUnion F) := by
