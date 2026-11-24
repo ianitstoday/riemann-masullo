@@ -1364,6 +1364,31 @@ private theorem modulatedQuotientLogMoment_bases_quotient (σ : ℕ ≃ J) (ψ :
     IsSchauderBasis (ψ ∘ σ) (D ∘ σ) := by
   sorry
 
+/-- In a nuclear Fréchet space, the coefficient functionals of an absolute Schauder basis form an
+unconditional Schauder basis of the strong dual, with the evaluations at the basis vectors as
+coordinates. Such a space is complete and barrelled, and it is reflexive because it is Montel. -/
+private theorem modulatedQuotientLogMoment_bases_dual_of_nuclear_frechet {X : Type*}
+    [AddCommGroup X] [Module ℂ X] [TopologicalSpace X] [IsTopologicalAddGroup X]
+    [ContinuousSMul ℂ X] (hN : IsNuclearTVS.{0} X) (hF : IsFrechetTVS X)
+    (x : ℕ → X) (f : ℕ → StrongDual ℂ X) (hb : IsSchauderBasis x f)
+    (ha : SchauderBasis.IsAbsolute x f) :
+    IsSchauderBasis f (fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x n)) ∧
+      SchauderBasis.IsUnconditional f
+        (fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) (x n)) := by
+  let : BarrelledSpace ℂ X := isFrechetTVS_barrelled hF
+  obtain ⟨hadd, hpoly, hmetr, hcomplete⟩ := hF
+  let : UniformSpace X := IsTopologicalAddGroup.rightUniformSpace X
+  have : IsUniformAddGroup X := isUniformAddGroup_of_addCommGroup
+  have hComplete : CompleteSpace X := hcomplete
+  have : MontelSpace ℂ X := ⟨fun Kset hK hbounded ↦ by
+    simpa only [hK.closure_eq] using isCompact_closure_of_isNuclearTVS X hN hbounded⟩
+  have hReflexive : IsHomeomorph
+      (ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) : X → StrongDual ℂ (StrongDual ℂ X)) :=
+    isHomeomorph_iff_isEmbedding_surjective.mpr
+      ⟨isEmbedding_strongBidual_eval, surjective_strongBidual_eval⟩
+  exact ⟨SchauderBasis.isShrinking_of_isAbsolute hComplete hReflexive hb ha,
+    SchauderBasis.strongDual_isUnconditional_of_isAbsolute hComplete hReflexive hb ha⟩
+
 include hcomm in
 /-- Paper: Theorem 4.6.1.5 and Equation (4.6.1.16), p. 212, via Lemma 4.1.2.4, p. 159. Once
 the descended log-moments are the coefficient functionals of an absolute Schauder basis of the
@@ -1376,7 +1401,14 @@ private theorem modulatedQuotientLogMoment_bases_dual (σ : ℕ ≃ J) (ψ : J �
     let ev : ℕ → StrongDual ℂ (StrongDual ℂ U) :=
       fun n ↦ ContinuousLinearMap.applyₗ ℂ (RingHom.id ℂ) ((ψ ∘ σ) n)
     IsSchauderBasis d ev ∧ SchauderBasis.IsUnconditional d ev := by
-  sorry
+  intro d ev
+  have hS₀ : ∀ g ∈ List.ofFn γs, 1 < (m g).val := by
+    intro g hg
+    obtain ⟨k, rfl⟩ := List.mem_ofFn.mp hg
+    exact hγs k
+  obtain ⟨-, hN, hF⟩ := modulatedIsotypicDifferenceProduct_quotient (m := m) (hm := hm)
+    (hms := hms) (ω := ω) (List.ofFn γs) hS₀
+  exact modulatedQuotientLogMoment_bases_dual_of_nuclear_frechet hN hF (ψ ∘ σ) (D ∘ σ) hb ha
 
 include hcomm in
 /-- Paper: Theorem 4.6.1.5 and Equations (4.6.1.15)–(4.6.1.16), p. 212.
