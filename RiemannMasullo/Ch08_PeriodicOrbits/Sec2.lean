@@ -306,19 +306,44 @@ theorem adeleNormOneOrbitUnion_t2Space : T2Space (adeleNormOneOrbitUnion F) := b
   have := t2Space_adeleRing F
   infer_instance
 
+/-- The S-adele ring is metrizable: it is a finite product of normed fields. The product
+has to be written out for the search to see it, as in `t2Space_sAdeleRing`. -/
+private theorem sAdeleNormOneOrbitUnion_metrizableSpace_sAdeleRing
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    MetrizableSpace (SAdeleRing F S) := by
+  change MetrizableSpace
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → (v.val.adicCompletion F)))
+  infer_instance
+
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is metrizable. -/
 theorem sAdeleNormOneOrbitUnion_metrizableSpace :
     MetrizableSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_metrizableSpace_sAdeleRing F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is metrizable. -/
 theorem adeleNormOneOrbitUnion_metrizableSpace : MetrizableSpace (adeleNormOneOrbitUnion F) := by
   sorry
 
+/-- The S-adele ring is second countable: each infinite completion embeds isometrically
+in the complex numbers, and each finite completion is a proper metric space. -/
+private theorem sAdeleNormOneOrbitUnion_secondCountable_sAdeleRing
+    (F : Type*) [Field F] [NumberField F] (S : Finset (HeightOneSpectrum (𝓞 F))) :
+    SecondCountableTopology (SAdeleRing F S) := by
+  have h1 (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  have h2 (v : S) : SecondCountableTopology (v.val.adicCompletion F) := by
+    have := properSpace_adicCompletion (K := F) v.val
+    infer_instance
+  change SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → (v.val.adicCompletion F)))
+  infer_instance
+
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is second-countable. -/
 theorem sAdeleNormOneOrbitUnion_secondCountable :
     SecondCountableTopology (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_secondCountable_sAdeleRing F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is second-countable. -/
 theorem adeleNormOneOrbitUnion_secondCountable :
@@ -328,7 +353,8 @@ theorem adeleNormOneOrbitUnion_secondCountable :
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is perfectly normal. -/
 theorem sAdeleNormOneOrbitUnion_perfectlyNormal :
     PerfectlyNormalSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_metrizableSpace F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is perfectly normal. -/
 theorem adeleNormOneOrbitUnion_perfectlyNormal :
@@ -337,7 +363,8 @@ theorem adeleNormOneOrbitUnion_perfectlyNormal :
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is separable. -/
 theorem sAdeleNormOneOrbitUnion_separableSpace : SeparableSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have := sAdeleNormOneOrbitUnion_secondCountable F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is separable. -/
 theorem adeleNormOneOrbitUnion_separableSpace : SeparableSpace (adeleNormOneOrbitUnion F) := by
