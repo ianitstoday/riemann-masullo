@@ -3,6 +3,7 @@ module
 public import RiemannMasullo.Ch10_TraceSpectral.Sec3
 
 import RiemannMasullo.Ch10_TraceSpectral.Sec1
+import RiemannMasullo.Ch10_TraceSpectral.Sec2_Printed
 import RiemannMasullo.Ch12_TraceGeometric.Sec5
 
 /-! # The line and strip trace formulas with the printed multiplicity -/
@@ -208,17 +209,27 @@ private theorem spectralLineConvolution_trace_false_test (F : Type) [Field F] [N
     rw [key, hint, Complex.mul_re, Complex.ofReal_re, Complex.ofReal_im, mul_zero, sub_zero]
     exact mul_pos hpos hpos
 
-/-- Some completed Hecke L-function has a zero of order at least two on some vertical line,
-for some basepoint choice. `Ch10_TraceSpectral/Sec2_Printed.lean` proves this privately for
-the trivial character of the splitting field of X³ − 2, as
-`spectralLineJet_memLp_false_multipleZero`, and its public `Printed.spectralLineJet_memLp_false`
-gives the present form through `spectralLineJet_memLp`. Neither is available here, since
-a file of printed claims has no importers. -/
+/-- Some completed Hecke L-function has a zero of order at least two on some vertical line.
+Otherwise the printed jet cutoff would select only zeroth jets, which are square integrable
+for the reciprocal weight, while the printed jet integrability is refuted. -/
 private theorem spectralLineConvolution_trace_false_multipleZero :
     ∃ (F : Type) (_ : Field F) (_ : NumberField F)
       (χ : PontryaginDual C₁(F) → PontryaginDual C𝔽(F)) (_ : IsSpectralBasepointChoice (F := F) χ)
       (a : ℝ) (ω : PontryaginDual C₁(F)) (t : ℝ),
-      2 ≤ (orderAt(F, χ ω, shift(a, t))).untop₀.toNat := by sorry
+      2 ≤ (orderAt(F, χ ω, shift(a, t))).untop₀.toNat := by
+  by_contra hno
+  apply Printed.spectralLineJet_memLp_false
+  intro F _ _ χ hχ a s hs ω t k hk
+  have hord : (orderAt(F, χ ω, shift(a, t))).untop₀.toNat < 2 := by
+    by_contra h
+    exact hno ⟨F, inferInstance, inferInstance, χ, hχ, a, ω, t, not_lt.mp h⟩
+  have hk1 := (lt_min_iff.mp hk).1
+  have hk0 : k = 0 := by omega
+  subst hk0
+  have hmem := spectralLineJet_memLp (F := F) χ (a := a) hs
+    ⟨(ω, t, 0), (lt_spectralBoundaryMultiplicity s _ 0).mpr
+      ⟨hk1, by rw [Nat.cast_zero]; linarith⟩⟩
+  simpa only [neg_zero] using hmem
 
 /-- A zero of order at least two on the line refutes the printed floor multiplicity at
 Sobolev degree three. The trace of any nuclear convolution is the sum with the strict cutoff,
