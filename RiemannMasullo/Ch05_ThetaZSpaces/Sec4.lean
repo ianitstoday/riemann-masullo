@@ -421,12 +421,165 @@ private theorem existsUnique_sLocalZetaMatchingDifference_multiplier
   exact ENNReal.toReal_mono (hv.const_smul C).eLpNorm_ne_top
     (eLpNorm_mono hu.aestronglyMeasurable hle)
 
+/-- The finite Euler factors of a unitary global lift are bounded on a half-plane to the right
+of the imaginary axis. -/
+private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth_euler
+    (η : PontryaginDual (IdeleClassGroup (𝓞 F) F)) (v : HeightOneSpectrum (𝓞 F)) (a : ℝ)
+    (ha : 0 < a) :
+    ∃ E : ℝ, 0 ≤ E ∧ ∀ z : ℂ, a ≤ z.re → ‖finiteHeckeEulerFactor η v z‖ ≤ E := by
+  classical
+  have hq : (1 : ℝ) < v.asIdeal.absNorm := by
+    exact_mod_cast HeightOneSpectrum.one_lt_absNorm v
+  have hlt : (v.asIdeal.absNorm : ℝ) ^ (-a) < 1 :=
+    Real.rpow_lt_one_of_one_lt_of_neg hq (by linarith)
+  refine ⟨max 1 (1 - (v.asIdeal.absNorm : ℝ) ^ (-a))⁻¹, by positivity, fun z hz ↦ ?_⟩
+  rw [show finiteHeckeEulerFactor η v z = if (ideleClassNormTwist η 0).IsUnramifiedAt v then
+    (1 - (ideleClassNormTwist η 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z))⁻¹ else 1 from rfl]
+  split_ifs
+  · rw [norm_inv]
+    refine (inv_anti₀ (sub_pos.mpr hlt) ?_).trans (le_max_right _ _)
+    have hn : ‖(ideleClassNormTwist η 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z)‖ ≤
+        (v.asIdeal.absNorm : ℝ) ^ (-a) := by
+      rw [norm_mul, norm_ideleClassNormTwist_zero_localValue, one_mul, ← Complex.ofReal_natCast,
+        Complex.norm_cpow_eq_rpow_re_of_pos (zero_lt_one.trans hq), Complex.neg_re]
+      exact Real.rpow_le_rpow_of_exponent_le hq.le (by linarith)
+    have hsub := norm_sub_norm_le (1 : ℂ)
+      ((ideleClassNormTwist η 0).localValue v * (v.asIdeal.absNorm : ℂ) ^ (-z))
+    rw [norm_one] at hsub
+    linarith
+  · rw [norm_one]
+    exact le_max_left _ _
+
+/-- Away from a discrete set of exponents, the correcting factor is bounded at large height on a
+closed substrip of the critical strip by a power of the height. -/
+private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth_tail (χ : PontryaginDual Jₛ)
+    (a b : ℝ) (ha : 0 < a) (hb : b < 1) :
+    ∃ C T : ℝ, ∀ᶠ z : ℂ in codiscrete ℂ, z.re ∈ Icc a b → T ≤ |z.im| →
+      ‖ρₛ(χ, z)‖ ≤ C * (1 + |z.im|) ^ Module.finrank ℚ F := by
+  classical
+  obtain ⟨η, h, he, -⟩ := sLocal_character_extension χ
+  obtain ⟨Cε, hCε, hε⟩ := sLocalEpsilonFactor_bounded_on_strip χ a b
+  obtain ⟨CΓ, T, hCΓ, -, hΓ⟩ := heckeGamma_reflection_bound η⁻¹ (1 - b) (1 - a)
+  obtain ⟨D, hD, hP⟩ := cleared_finite_positive_bound (S := S) η⁻¹
+  choose E hE hEz using fun v : S ↦
+    existsUnique_sLocalZetaMatchingDifference_rhoGrowth_euler η v.val a ha
+  refine ⟨Cε * CΓ * (∏ v, E v) * D, max T 1, ?_⟩
+  filter_upwards [sLocalRhoFactor_eq_epsilon_mul χ] with z hρ hz hzT
+  dsimp only at hρ
+  have hy1 : 1 ≤ |z.im| := (le_max_right T 1).trans hzT
+  have e3 : |(1 - z).im| = |z.im| := by
+    rw [Complex.sub_im, Complex.one_im, zero_sub, abs_neg]
+  have hG := hΓ (1 - z) (by rw [Complex.sub_re, Complex.one_re]; linarith [hz.2])
+    (by rw [Complex.sub_re, Complex.one_re]; linarith [hz.1])
+    (by rw [e3]; exact (le_max_left T 1).trans hzT)
+  rw [inv_inv, sub_sub_cancel, e3] at hG
+  have hpow : |z.im| ^ ((Module.finrank ℚ F : ℝ) * (1 / 2 - (1 - z).re)) ≤
+      (1 + |z.im|) ^ Module.finrank ℚ F := by
+    have hle := Real.rpow_le_rpow_of_exponent_le hy1
+      (show (Module.finrank ℚ F : ℝ) * (1 / 2 - (1 - z).re) ≤ (Module.finrank ℚ F : ℝ) by
+        rw [Complex.sub_re, Complex.one_re]
+        nlinarith [hz.2, (Nat.cast_nonneg (Module.finrank ℚ F) : (0 : ℝ) ≤ Module.finrank ℚ F)])
+    rw [Real.rpow_natCast] at hle
+    exact hle.trans (pow_le_pow_left₀ (abs_nonneg _) (by linarith) _)
+  have hGn : 0 ≤ CΓ * (1 + |z.im|) ^ Module.finrank ℚ F := by positivity
+  have h2 := hG.trans (mul_le_mul_of_nonneg_left hpow hCΓ.le)
+  have h3 : ‖∏ v : S, finiteHeckeEulerFactor η v.val z‖ ≤ ∏ v, E v := by
+    rw [norm_prod]
+    exact Finset.prod_le_prod₀ (fun v _ ↦ norm_nonneg _) fun v _ ↦ hEz v z hz.1
+  have h4 : ‖(∏ v : S, finiteHeckeEulerFactor η⁻¹ v.val (1 - z))⁻¹‖ ≤ D := by
+    rw [← Finset.prod_inv_distrib]
+    exact hP (1 - z) (by rw [Complex.sub_re, Complex.one_re]; linarith [hz.2])
+  rw [hρ, dual_norm_chart, sLocalHeckeL_eq_partialEulerProduct χ η h he,
+    cleared_inverse_factors χ η h he,
+    show ∀ e G P G' P' : ℂ, e * (G * P / (G' * P')) = e * (G / G') * P * P'⁻¹ from
+      fun e G P G' P' ↦ by ring,
+    norm_mul, norm_mul, norm_mul]
+  calc _ ≤ Cε * (CΓ * (1 + |z.im|) ^ Module.finrank ℚ F) * (∏ v, E v) * D :=
+        mul_le_mul (mul_le_mul (mul_le_mul (hε z hz) h2 (norm_nonneg _) hCε) h3 (norm_nonneg _)
+          (mul_nonneg hCε hGn)) h4 (norm_nonneg _)
+          (mul_nonneg (mul_nonneg hCε hGn) (Finset.prod_nonneg fun v _ ↦ hE v))
+    _ = _ := by ring
+
+/-- For a function continuous on the right half-plane, a bound that holds away from a discrete
+set at large height on a strip holds at every point of a smaller closed strip above that
+height. -/
+private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth_extend (R : ℂ → ℂ)
+    (hR : ContinuousOn R (Complex.re ⁻¹' Ioi 0)) (a b a' b' : ℝ) (ha' : 0 < a') (haa : a' < a)
+    (hbb : b < b') (C T : ℝ) (n : ℕ)
+    (h : ∀ᶠ z : ℂ in codiscrete ℂ, z.re ∈ Icc a' b' → T ≤ |z.im| →
+      ‖R z‖ ≤ C * (1 + |z.im|) ^ n) :
+    ∀ z : ℂ, z.re ∈ Icc a b → T + 1 ≤ |z.im| → ‖R z‖ ≤ C * (1 + |z.im|) ^ n := by
+  intro z hz hzT
+  have h1 : ∀ᶠ w in 𝓝 z, a' < w.re := (isOpen_lt continuous_const Complex.continuous_re).mem_nhds
+    (show a' < z.re from haa.trans_le hz.1)
+  have h2 : ∀ᶠ w in 𝓝 z, w.re < b' := (isOpen_lt Complex.continuous_re continuous_const).mem_nhds
+    (show z.re < b' from hz.2.trans_lt hbb)
+  have h3 : ∀ᶠ w in 𝓝 z, T < |w.im| :=
+    (isOpen_lt continuous_const Complex.continuous_im.abs).mem_nhds
+      (show T < |z.im| by linarith)
+  have hev : ∀ᶠ w in 𝓝[≠] z, ‖R w‖ ≤ C * (1 + |w.im|) ^ n := by
+    filter_upwards [h.filter_mono (nhdsNE_le_codiscrete z),
+      nhdsWithin_le_nhds (h1.and (h2.and h3))] with w hw hw'
+    exact hw ⟨hw'.1.le, hw'.2.1.le⟩ hw'.2.2.le
+  have hc : ContinuousAt R z :=
+    hR.continuousAt ((isOpen_Ioi.preimage Complex.continuous_re).mem_nhds
+      (show z.re ∈ Ioi (0 : ℝ) from (ha'.trans haa).trans_le hz.1))
+  have hl : Tendsto (fun w ↦ ‖R w‖) (𝓝[≠] z) (𝓝 ‖R z‖) :=
+    hc.norm.tendsto.mono_left nhdsWithin_le_nhds
+  have hr : Tendsto (fun w : ℂ ↦ C * (1 + |w.im|) ^ n) (𝓝[≠] z) (𝓝 (C * (1 + |z.im|) ^ n)) :=
+    ((continuous_const.mul ((continuous_const.add Complex.continuous_im.abs).pow n)).tendsto
+      z).mono_left nhdsWithin_le_nhds
+  exact le_of_tendsto_of_tendsto hl hr hev
+
+/-- A function continuous on a closed vertical strip in the right half-plane, with a polynomial
+bound at large height, has a polynomial bound in the modulus on the whole strip. -/
+private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth_assemble (R : ℂ → ℂ)
+    (a b : ℝ) (ha : 0 < a) (hc : ContinuousOn R (Complex.re ⁻¹' Icc a b)) (C₁ T : ℝ) (n : ℕ)
+    (hbound : ∀ z : ℂ, z.re ∈ Icc a b → T ≤ |z.im| → ‖R z‖ ≤ C₁ * (1 + |z.im|) ^ n) :
+    ∃ C ≥ (0 : ℝ), ∃ m : ℕ, ∀ z ∈ Complex.re ⁻¹' Icc a b, ‖R z‖ ≤ C * ‖z‖ ^ m := by
+  have hK : IsCompact (Complex.reProdIm (Icc a b) (Icc (-|T|) |T|)) :=
+    isCompact_Icc.reProdIm isCompact_Icc
+  obtain ⟨C₂, hC₂⟩ := hK.exists_bound_of_continuousOn (hc.mono fun z hz ↦ hz.1)
+  refine ⟨(|C₁| + |C₂|) * (1 / a + 1) ^ n, by positivity, n, fun z hz ↦ ?_⟩
+  have hza : a ≤ ‖z‖ := hz.1.trans ((le_abs_self _).trans (Complex.abs_re_le_norm z))
+  have h1 : 1 ≤ 1 / a * ‖z‖ := by
+    rw [one_div, inv_mul_eq_div, le_div_iff₀ ha, one_mul]
+    exact hza
+  have hX : 1 + |z.im| ≤ (1 / a + 1) * ‖z‖ := by
+    nlinarith [Complex.abs_im_le_norm z]
+  have hX1 : 1 ≤ (1 / a + 1) * ‖z‖ := le_trans (by linarith [abs_nonneg z.im]) hX
+  rw [mul_assoc, ← mul_pow]
+  by_cases hT : T ≤ |z.im|
+  · calc ‖R z‖ ≤ C₁ * (1 + |z.im|) ^ n := hbound z hz hT
+      _ ≤ |C₁| * ((1 / a + 1) * ‖z‖) ^ n :=
+        mul_le_mul (le_abs_self C₁) (pow_le_pow_left₀ (by positivity) hX n) (by positivity)
+          (abs_nonneg _)
+      _ ≤ (|C₁| + |C₂|) * ((1 / a + 1) * ‖z‖) ^ n :=
+        mul_le_mul_of_nonneg_right (le_add_of_nonneg_right (abs_nonneg _)) (by positivity)
+  · have hzK : z ∈ Complex.reProdIm (Icc a b) (Icc (-|T|) |T|) :=
+      ⟨hz, abs_le.mp ((not_le.mp hT).le.trans (le_abs_self T))⟩
+    calc ‖R z‖ ≤ C₂ := hC₂ z hzK
+      _ ≤ |C₂| * 1 := by rw [mul_one]; exact le_abs_self _
+      _ ≤ (|C₁| + |C₂|) * ((1 / a + 1) * ‖z‖) ^ n :=
+        mul_le_mul (le_add_of_nonneg_left (abs_nonneg _)) (one_le_pow₀ hX1) zero_le_one
+          (by positivity)
+
 /-- The S-local correcting factor has polynomial growth on every closed substrip
 of the overlap. The degree may depend on the substrip and the character. -/
 private theorem existsUnique_sLocalZetaMatchingDifference_rhoGrowth (χ : PontryaginDual Jₛ)
     (a b : ℝ) (hab : a ≤ b) (hsub : Icc a b ⊆ overlapInterval) :
     ∃ C ≥ (0 : ℝ), ∃ m : ℕ, ∀ z ∈ Complex.re ⁻¹' Icc a b, ‖ρₛ(χ, z)‖ ≤ C * ‖z‖ ^ m := by
-  sorry
+  have ha : 0 < a := (hsub (left_mem_Icc.mpr hab)).1
+  have hb : b < 1 := (hsub (right_mem_Icc.mpr hab)).2
+  have hρ := sLocalRhoFactor_iteratedDeriv_analyticOn χ 0
+  rw [iteratedDeriv_zero] at hρ
+  obtain ⟨C, T, hCT⟩ := existsUnique_sLocalZetaMatchingDifference_rhoGrowth_tail χ (a / 2)
+    ((b + 1) / 2) (by linarith) (by linarith)
+  exact existsUnique_sLocalZetaMatchingDifference_rhoGrowth_assemble (fun z ↦ ρₛ(χ, z)) a b ha
+    (hρ.continuousOn.mono fun z hz ↦ ha.trans_le hz.1) C (T + 1) (Module.finrank ℚ F)
+    (existsUnique_sLocalZetaMatchingDifference_rhoGrowth_extend (fun z ↦ ρₛ(χ, z))
+      hρ.continuousOn a b (a / 2) ((b + 1) / 2) (by linarith) (by linarith) (by linarith) C T
+      (Module.finrank ℚ F) hCT)
 
 /-- Paper: (5.4.1.3), p. 266.
 Subtracting the corrected second component from the first on the overlap is a
@@ -1606,6 +1759,254 @@ local notation "L²ₛ" => MeasureTheory.Lp ℂ 2 μweighted
 local notation "Ẽ(" I ")" => ModulatedExponentialDecay (⟨mₛ, hmₛ⟩ : Jₛ →ₜ* ℝ≥0ˣ) I
 local notation "reflect(" I ")" => ((fun a : ℝ ↦ 1 - a) ⁻¹' I)
 
+/-- The norm-product measure integrates an exponentially decaying function of the log norm. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_integrable :
+    Integrable (fun g : Jₛ ↦ Real.exp (-|Real.log (normℝ(mₛ g))| / 2)) μₛ := by
+  let Q (t : ℝ≥0ˣ) := Real.exp (-|Real.log (normℝ(t))| / 2)
+  have hQ : Continuous Q := by
+    unfold Q
+    exact Real.continuous_exp.comp <|
+      (((NNReal.continuous_coe.comp Units.continuous_val).log fun t ↦
+        (NNReal.coe_pos.mpr t.zero_lt).ne').abs.neg.div_const 2)
+  have hpos : IntegrableOn (fun x : ℝ ↦ Real.exp (-|x| / 2)) (Ioi 0) := by
+    refine (integrableOn_exp_mul_Ioi (a := -(1/2)) (by norm_num) 0).congr_fun
+      (fun x hx ↦ congrArg Real.exp ?_) measurableSet_Ioi
+    rw [abs_of_pos (show 0 < x from hx)]
+    ring
+  have hneg : IntegrableOn (fun x : ℝ ↦ Real.exp (-|x| / 2)) (Iic 0) := by
+    refine (integrableOn_exp_mul_Iic (a := 1/2) (by norm_num) 0).congr_fun
+      (fun x hx ↦ congrArg Real.exp ?_) measurableSet_Iic
+    rw [abs_of_nonpos (show x ≤ 0 from hx)]
+    ring
+  have hReal : Integrable (fun x : ℝ ↦ Real.exp (-|x| / 2)) := by
+    rw [← integrableOn_univ, ← Ioi_union_Iic]
+    exact hpos.union hneg
+  let : BorelSpace ℝ≥0ˣ := borelSpace_units_of_continuousInv₀ ℝ≥0
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (x : ℝ) : e x = Units.mk0 (Real.exp x).toNNReal (by positivity) := by
+    apply Units.ext
+    apply NNReal.eq
+    exact (Real.coe_toNNReal _ (Real.exp_pos x).le).symm
+  have hHaar : positiveRealHaar = Measure.map e volume := by
+    rw [funext he]
+    rfl
+  have hQint : Integrable Q positiveRealHaar := by
+    rw [hHaar, integrable_map_measure hQ.aestronglyMeasurable e.continuous.measurable.aemeasurable]
+    refine hReal.congr (ae_of_all _ fun x ↦ ?_)
+    have hx : normℝ(e x) = Real.exp x :=
+      (congrArg (fun t : ℝ≥0ˣ ↦ normℝ(t)) (he x)).trans
+        (Real.coe_toNNReal _ (Real.exp_pos x).le)
+    change _ = Real.exp (-|Real.log (normℝ(e x))| / 2)
+    rw [hx, Real.log_exp]
+  let : SigmaFinite positiveRealHaar := by
+    rw [hHaar]
+    exact e.toMeasurableEquiv.sigmaFinite_map
+  let p := Units.map (adeleProjection F S).toMonoidHom
+  have hp : Continuous p := (continuous_fst.prodMk (continuous_pi fun v : S ↦
+    (RestrictedProduct.continuous_eval v.val).comp continuous_snd)).units_map _
+  let τ : ℝ≥0ˣ →ₜ* Aₛˣ := ⟨p.comp (canonicalIdeleNormSection F),
+    hp.comp (canonicalIdeleNormSection_continuous F)⟩
+  have hτ : RightInverse τ (sIdeleNorm F S) := thetaSection_rightInverse F S
+  let μ₁ := sLocalNormOneQuotientMeasure F S
+  let : MeasurableSpace J₁ := borel _
+  let : BorelSpace J₁ := ⟨rfl⟩
+  let : BorelSpace Jₛ := ⟨rfl⟩
+  let (v : S) : ProperSpace (v.val.adicCompletion F) := properSpace_adicCompletion v.val
+  let (w : InfinitePlace F) : SecondCountableTopology w.Completion :=
+    (InfinitePlace.Completion.isometry_extensionEmbedding w).isEmbedding.secondCountableTopology
+  let : SecondCountableTopology Aₛ := inferInstanceAs (SecondCountableTopology
+    (((w : InfinitePlace F) → w.Completion) × ((v : S) → v.val.adicCompletion F)))
+  let : SecondCountableTopology Aₛˣ := (sIdeleGroup_description F S).1.secondCountableTopology
+  let : SecondCountableTopology Jₛ := inferInstance
+  let : CompactSpace J₁ := isCompact_iff_compactSpace.mp
+    ((isProperMap_sIdeleQuotientNorm F S).isCompact_preimage isCompact_singleton)
+  have hprod := sLocalNormOneQuotientMeasure_normProduct (F := F) (S := S)
+  let : μ₁.IsHaarMeasure := hprod.1
+  let : IsFiniteMeasure μ₁ := ⟨isCompact_univ.measure_lt_top⟩
+  let a (z : J₁ × ℝ≥0ˣ) : Jₛ := z.1.val * QuotientGroup.mk (τ z.2)
+  have ha : Measurable a :=
+    (continuous_subtype_val.measurable.comp measurable_fst).mul
+      ((QuotientGroup.continuous_mk.comp τ.continuous).measurable.comp measurable_snd)
+  have hQnorm : Continuous (Q ∘ mₛ) := hQ.comp hmₛ
+  change Integrable (Q ∘ mₛ) μₛ
+  rw [← hprod.2 τ hτ, integrable_map_measure hQnorm.aestronglyMeasurable ha.aemeasurable]
+  refine (hQint.comp_snd μ₁).congr (ae_of_all _ fun z ↦ ?_)
+  change Q z.2 = Q (mₛ (z.1.val * QuotientGroup.mk (τ z.2)))
+  rw [map_mul, z.1.property, one_mul]
+  exact congrArg Q (hτ z.2).symm
+
+/-- A class of norm one is a limit of classes of norm greater than one. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_closure (g : Jₛ) (hg : mₛ g = 1) :
+    g ∈ closure {x : Jₛ | 1 < normℝ(mₛ x)} := by
+  obtain ⟨σ, hσ⟩ := sIdeleQuotientNorm_exists_section F S
+  let e : ℝ ≃ₜ ℝ≥0ˣ := Real.expOrderIso.toHomeomorph.trans (Nonneg.unitsHomeomorphPos ℝ).symm
+  have he (x : ℝ) : normℝ(e x) = Real.exp x := rfl
+  have hc : Continuous fun x : ℝ ↦ g * σ (e x) :=
+    continuous_const.mul (σ.continuous.comp e.continuous)
+  have h1 : e 0 = 1 := Units.ext (NNReal.eq ((he 0).trans Real.exp_zero))
+  have h0 : g * σ (e 0) = g := by rw [h1, map_one, mul_one]
+  have hmem : (0 : ℝ) ∈ closure (Ioi (0 : ℝ)) := by
+    rw [closure_Ioi]
+    exact self_mem_Ici
+  have hmap := map_mem_closure hc hmem (t := {x : Jₛ | 1 < normℝ(mₛ x)}) (fun x hx ↦ by
+    change 1 < normℝ(mₛ (g * σ (e x)))
+    rw [map_mul, hg, one_mul, hσ (e x), he]
+    exact Real.one_lt_exp_iff.mpr hx)
+  exact h0 ▸ hmap
+
+/-- Bounded families of S-adelic tests share an integrable majorant for their weighted squares. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_majorant (B : Set ℬₛ)
+    (hB : Bornology.IsVonNBounded ℂ B) :
+    ∃ C : ℝ, 0 ≤ C ∧ ∀ f ∈ B, ∀ g : Jₛ,
+      ‖sLocalAdelicThetaOnClasses F S f g‖ ^ 2 * normℝ(mₛ g) ≤
+        C ^ 2 * Real.exp (-|Real.log (normℝ(mₛ g))| / 2) := by
+  obtain ⟨C₁, hC₁, hlarge⟩ := sLocalAdelicTheta_decay_bounded_threshold_one F S B hB 1
+  obtain ⟨C₂, hC₂, hsmall⟩ :=
+    sLocalAdelicTheta_norm_pow_bounded_threshold_one F S (1/4) (by norm_num) B hB
+  let C := max C₁ C₂
+  have hC : 0 ≤ C := hC₁.le.trans (le_max_left _ _)
+  refine ⟨C, hC, fun f hf g ↦ ?_⟩
+  let r := normℝ(mₛ g)
+  have hr : 0 < r := NNReal.coe_pos.mpr (mₛ g).zero_lt
+  change _ * r ≤ C ^ 2 * Real.exp (-|Real.log r| / 2)
+  rcases lt_or_ge r 1 with hs | hs
+  · have hb : r ^ (1/4 : ℝ) * ‖sLocalAdelicThetaOnClasses F S f g‖ ≤ C₂ := by
+      obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+      have hu := hsmall f hf u hs
+      change ‖(r ^ (1/4 : ℝ)) • sLocalAdelicTheta F S f u‖ ≤ C₂ at hu
+      rwa [norm_smul, Real.norm_of_nonneg (Real.rpow_nonneg hr.le _),
+        ← sLocalAdelicThetaOnClasses_mk] at hu
+    have he : r ^ (-(1/4 : ℝ)) * r ^ (1/4 : ℝ) = 1 := by
+      rw [← Real.rpow_add hr, neg_add_cancel, Real.rpow_zero]
+    have hb' : ‖sLocalAdelicThetaOnClasses F S f g‖ ≤ C * r ^ (-(1/4 : ℝ)) := by
+      have H := mul_le_mul_of_nonneg_left (hb.trans (le_max_right C₁ C₂))
+        (Real.rpow_nonneg hr.le (-(1/4 : ℝ)))
+      rw [← mul_assoc, he, one_mul, mul_comm] at H
+      exact H
+    calc
+      _ ≤ (C * r ^ (-(1/4 : ℝ))) ^ 2 * r := by gcongr
+      _ = C ^ 2 * Real.exp (-|Real.log r| / 2) := by
+        rw [mul_pow, mul_assoc, abs_of_nonpos (Real.log_nonpos hr.le hs.le)]
+        congr 1
+        calc
+          _ = Real.exp (Real.log r * (-(1/4 : ℝ)) + Real.log r * (-(1/4 : ℝ))) *
+              Real.exp (Real.log r) := by
+            rw [Real.exp_add, Real.exp_log hr, Real.rpow_def_of_pos hr, pow_two]
+          _ = _ := by rw [← Real.exp_add]; congr 1; ring
+  · have hcl : IsClosed {x : Jₛ | ‖sLocalAdelicThetaOnClasses F S f x‖ * normℝ(mₛ x) ≤ C₁} :=
+      isClosed_le ((sLocalAdelicThetaOnClasses F S f).continuous.norm.mul
+        (NNReal.continuous_coe.comp (Units.continuous_val.comp hmₛ))) continuous_const
+    have hsub : {x : Jₛ | 1 < normℝ(mₛ x)} ⊆
+        {x : Jₛ | ‖sLocalAdelicThetaOnClasses F S f x‖ * normℝ(mₛ x) ≤ C₁} := by
+      intro x hx
+      obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective x
+      have hu : ‖sLocalAdelicTheta F S f u‖ ≤ C₁ * (normℝ(sIdeleNorm F S u))⁻¹ := by
+        simpa only [pow_one] using hlarge f hf u hx
+      change ‖sLocalAdelicThetaOnClasses F S f (QuotientGroup.mk u)‖ *
+        normℝ(sIdeleNorm F S u) ≤ C₁
+      rw [sLocalAdelicThetaOnClasses_mk]
+      exact (le_div_iff₀ (zero_lt_one.trans hx)).mp (by rwa [div_eq_mul_inv])
+    have hone : ‖sLocalAdelicThetaOnClasses F S f g‖ * r ≤ C₁ := by
+      rcases hs.lt_or_eq with h1 | h1
+      · exact hsub h1
+      · exact closure_minimal hsub hcl (sLocalThetaWeightedL2_testMap_continuous_closure g
+          (Units.ext (NNReal.eq h1.symm)))
+    have hb : ‖sLocalAdelicThetaOnClasses F S f g‖ ≤ C * r⁻¹ := by
+      rw [← div_eq_mul_inv]
+      exact (le_div_iff₀ hr).mpr (hone.trans (le_max_left _ _))
+    calc
+      _ ≤ (C * r⁻¹) ^ 2 * r := by gcongr
+      _ = C ^ 2 * r⁻¹ := by field_simp
+      _ = C ^ 2 * Real.exp (-Real.log r) := by rw [Real.exp_neg, Real.exp_log hr]
+      _ ≤ C ^ 2 * Real.exp (-|Real.log r| / 2) := by
+        gcongr
+        rw [abs_of_nonneg (Real.log_nonneg hs)]
+        linarith [Real.log_nonneg hs]
+
+/-- An integrable majorant uniform on bounded families yields a bounded-set estimate in L². -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_ofMajorant
+    {M X : Type*} [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [MeasurableSpace X] (μ : Measure X) (r : X → ℝ) (hr : Measurable r)
+    (hrpos : ∀ g, 0 < r g) (H : X → ℝ) (hi : Integrable H μ)
+    (θ : M →ₗ[ℂ] (X → ℂ))
+    (hm : ∀ f, AEStronglyMeasurable (θ f) μ)
+    (hsingle : ∀ f : M, Bornology.IsVonNBounded ℂ {f})
+    (hb : ∀ B : Set M, Bornology.IsVonNBounded ℂ B → ∃ C : ℝ,
+      ∀ f ∈ B, ∀ g, ‖θ f g‖ ^ 2 * r g ≤ C ^ 2 * H g) :
+    let ν := μ.withDensity fun g ↦ ENNReal.ofReal (r g)
+    ∃ L : M →ₗ[ℂ] Lp ℂ 2 ν, (∀ f, ((L f) : X → ℂ) =ᵐ[ν] θ f) ∧
+      ∀ B : Set M, Bornology.IsVonNBounded ℂ B → ∃ q, ∀ f ∈ B, ‖L f‖ ≤ q := by
+  intro ν
+  have hrm : Measurable (fun g ↦ ENNReal.ofReal (r g)) := hr.ennreal_ofReal
+  have hμ : μ ≪ ν := withDensity_absolutelyContinuous' hrm.aemeasurable
+    (ae_of_all _ fun g ↦ (ENNReal.ofReal_pos.mpr (hrpos g)).ne')
+  have hν : ν ≪ μ := withDensity_absolutelyContinuous _ _
+  have hflt : ∀ᵐ g ∂μ, ENNReal.ofReal (r g) < ⊤ :=
+    ae_of_all _ fun _ ↦ ENNReal.ofReal_lt_top
+  have hI (f : M) : Integrable (fun g ↦ ‖θ f g‖ ^ 2 * r g) μ := by
+    obtain ⟨C, hC⟩ := hb {f} (hsingle f)
+    refine (hi.const_mul (C ^ 2)).mono' (((hm f).norm.pow 2).mul hr.aestronglyMeasurable)
+      (ae_of_all _ fun g ↦ ?_)
+    rw [Real.norm_of_nonneg (mul_nonneg (sq_nonneg _) (hrpos g).le)]
+    exact hC f rfl g
+  have hmem (f : M) : MemLp (θ f) 2 ν := by
+    refine (memLp_two_iff_integrable_sq_norm ((hm f).mono_ac hν)).2 ?_
+    refine (integrable_withDensity_iff hrm hflt).2 ((hI f).congr ?_)
+    exact ae_of_all _ fun g ↦ by simp only [ENNReal.toReal_ofReal (hrpos g).le]
+  let L : M →ₗ[ℂ] Lp ℂ 2 ν :=
+    { toFun := fun f ↦ (hmem f).toLp (θ f)
+      map_add' := fun f f' ↦ Lp.ext <| by
+        filter_upwards [(hmem (f + f')).coeFn_toLp, Lp.coeFn_add ((hmem f).toLp (θ f))
+          ((hmem f').toLp (θ f')), (hmem f).coeFn_toLp, (hmem f').coeFn_toLp] with g h₁ h₂ h₃ h₄
+        rw [h₁, h₂, map_add]
+        exact (congrArg₂ (· + ·) h₃ h₄).symm
+      map_smul' := fun c f ↦ Lp.ext <| by
+        filter_upwards [(hmem (c • f)).coeFn_toLp, Lp.coeFn_smul c ((hmem f).toLp (θ f)),
+          (hmem f).coeFn_toLp] with g h₁ h₂ h₃
+        rw [h₁, RingHom.id_apply, h₂, map_smul]
+        exact (congrArg (c • ·) h₃).symm }
+  have hL (f : M) : ((L f) : X → ℂ) =ᵐ[ν] θ f := (hmem f).coeFn_toLp
+  have hnorm (f : M) : ‖L f‖ = Real.sqrt (∫ g, ‖θ f g‖ ^ 2 * r g ∂μ) := by
+    rw [norm_eq_sqrt_re_inner (𝕜 := ℂ), L2.inner_def, ← integral_re (L2.integrable_inner _ _)]
+    simp_rw [inner_self_eq_norm_sq]
+    rw [integral_withDensity_eq_integral_toReal_smul hrm hflt]
+    refine congrArg Real.sqrt (integral_congr_ae ?_)
+    filter_upwards [hμ.ae_eq (hL f)] with g hg
+    simp only [smul_eq_mul, ENNReal.toReal_ofReal (hrpos g).le, hg, mul_comm]
+  refine ⟨L, hL, fun B hB ↦ ?_⟩
+  obtain ⟨C, hC⟩ := hb B hB
+  refine ⟨Real.sqrt (∫ g, C ^ 2 * H g ∂μ), fun f hf ↦ ?_⟩
+  rw [hnorm]
+  exact Real.sqrt_le_sqrt (integral_mono (hI f) (hi.const_mul _) (hC f hf))
+
+/-- A bounded-set estimate gives continuity on a first-countable stage. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_stage {E M V : Type*}
+    [AddCommGroup E] [Module ℂ E] [TopologicalSpace E] [IsTopologicalAddGroup E]
+    [ContinuousSMul ℂ E] [FirstCountableTopology E]
+    [AddCommGroup M] [Module ℂ M] [TopologicalSpace M]
+    [NormedAddCommGroup V] [NormedSpace ℂ V] (i : E →L[ℂ] M) (L : M →ₗ[ℂ] V)
+    (hbounded : ∀ B : Set M, Bornology.IsVonNBounded ℂ B → ∃ q, ∀ f ∈ B, ‖L f‖ ≤ q) :
+    Continuous (L.comp i.toLinearMap) := by
+  apply (L.comp i.toLinearMap).continuous_of_locally_bounded
+  intro B hB
+  obtain ⟨q, hq⟩ := hbounded _ (hB.image i)
+  refine (NormedSpace.isVonNBounded_iff ℂ).mpr (isBounded_iff_forall_norm_le.mpr ⟨q, ?_⟩)
+  rintro _ ⟨f, hf, rfl⟩
+  exact hq _ ⟨f, hf, rfl⟩
+
+/-- Continuity on Schwartz–Bruhat tests follows by checking the metrizable test stages. -/
+private theorem sLocalThetaWeightedL2_testMap_continuous_tests {V : Type*}
+    [NormedAddCommGroup V] [NormedSpace ℂ V] (L : ℬₛ →ₗ[ℂ] V)
+    (hbounded : ∀ B : Set ℬₛ, Bornology.IsVonNBounded ℂ B → ∃ q, ∀ f ∈ B, ‖L f‖ ≤ q) :
+    Continuous L := by
+  apply SchwartzBruhat.continuous_of_continuous_comp_ofStage
+  intro a e
+  let : FirstCountableTopology (SchwartzBruhatStage e) :=
+    elementarySchwartz_withSeminorms.firstCountableTopology
+  let : ContinuousSMul ℂ (SchwartzBruhatStage e) := elementarySchwartz_withSeminorms.continuousSMul
+  exact sLocalThetaWeightedL2_testMap_continuous_stage
+    ⟨SchwartzBruhat.ofStage a e, SchwartzBruhat.continuous_ofStage a e⟩ L hbounded
+
 /-- Paper: (5.4.2.1), p. 274.
 The theta test map is continuous into the weighted L² space, and its class is the
 almost-everywhere class of the theta function of the test.
@@ -1619,7 +2020,30 @@ at least one, so the small-norm bound is not available here. -/
 private theorem sLocalThetaWeightedL2_testMap_continuous :
     ∃ L : ℬₛ →L[ℂ] L²ₛ, ∀ f : ℬₛ,
       ((L f : Jₛ → ℂ)) =ᵐ[μweighted] sLocalAdelicThetaOnClasses F S f := by
-  sorry
+  let θ : ℬₛ →ₗ[ℂ] (Jₛ → ℂ) :=
+    { toFun := fun f ↦ sLocalAdelicThetaOnClasses F S f
+      map_add' := fun f f' ↦ funext fun g ↦ by
+        obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+        simp only [Pi.add_apply, sLocalAdelicThetaOnClasses_mk, map_add, ContinuousMap.add_apply]
+      map_smul' := fun c f ↦ funext fun g ↦ by
+        obtain ⟨u, rfl⟩ := QuotientGroup.mk_surjective g
+        simp only [Pi.smul_apply, sLocalAdelicThetaOnClasses_mk, map_smul, RingHom.id_apply,
+          ContinuousMap.smul_apply] }
+  let r (g : Jₛ) := normℝ(mₛ g)
+  let H (g : Jₛ) := Real.exp (-|Real.log (r g)| / 2)
+  have : BorelSpace Jₛ := ⟨rfl⟩
+  have hr : Continuous r := NNReal.continuous_coe.comp (Units.continuous_val.comp hmₛ)
+  have hrpos (g : Jₛ) : 0 < r g := NNReal.coe_pos.mpr (mₛ g).zero_lt
+  have hbound (B : Set ℬₛ) (hB : Bornology.IsVonNBounded ℂ B) :
+      ∃ C : ℝ, ∀ f ∈ B, ∀ g, ‖θ f g‖ ^ 2 * r g ≤ C ^ 2 * H g := by
+    obtain ⟨C, -, hC⟩ := sLocalThetaWeightedL2_testMap_continuous_majorant B hB
+    exact ⟨C, hC⟩
+  have hL := sLocalThetaWeightedL2_testMap_continuous_ofMajorant μₛ r hr.measurable hrpos H
+    sLocalThetaWeightedL2_testMap_continuous_integrable θ
+    (fun f ↦ (sLocalAdelicThetaOnClasses F S f).continuous.aestronglyMeasurable)
+    Bornology.isVonNBounded_singleton hbound
+  exact ⟨⟨hL.choose, sLocalThetaWeightedL2_testMap_continuous_tests hL.choose hL.choose_spec.2⟩,
+    hL.choose_spec.1⟩
 
 /-- The S-local theta kernel is exactly the kernel of the theta class function. -/
 private theorem sLocalThetaWeightedL2_theta_zero_iff (f : ℬₛ) :
