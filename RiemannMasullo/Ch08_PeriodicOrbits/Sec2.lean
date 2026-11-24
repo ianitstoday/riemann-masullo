@@ -439,7 +439,10 @@ theorem adeleNormOneOrbitUnion_sigmaCompactSpace :
 /-- Paper: Lemma 8.2.0.3, p. 385. The S-local norm-one orbit union is paracompact. -/
 theorem sAdeleNormOneOrbitUnion_paracompactSpace :
     ParacompactSpace (sAdeleNormOneOrbitUnion F S) := by
-  sorry
+  have h1 := sAdeleNormOneOrbitUnion_t2Space F S
+  have h2 := sAdeleNormOneOrbitUnion_locallyCompactSpace F S
+  have h3 := sAdeleNormOneOrbitUnion_sigmaCompactSpace F S
+  infer_instance
 
 /-- Paper: Lemma 8.2.0.3, p. 385. The global norm-one orbit union is paracompact. -/
 theorem adeleNormOneOrbitUnion_paracompactSpace : ParacompactSpace (adeleNormOneOrbitUnion F) := by
